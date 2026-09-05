@@ -154,21 +154,21 @@ npx skills add darknessomi/musicbox -y
 
 | 按键 | 功能 | 说明 |
 | --- | --- | --- |
-| `j` | Down | 下移 |
-| `k` | Up | 上移 |
+| `j` / `↓` | Down | 下移 |
+| `k` / `↑` | Up | 上移 |
 | `num + j` | Quick Jump | 快速向后跳转 n 首 |
 | `num + k` | Quick Up | 快速向前跳转 n 首 |
-| `h` | Back | 后退 |
-| `l` | Forward | 前进 |
-| `u` | Prev Page | 上一页 |
-| `d` | Next Page | 下一页 |
-| `f` | Search | 当前列表模糊搜索 |
-| `[` | Prev Song | 上一曲 |
-| `]` | Next Song | 下一曲 |
+| `h` / `←` | Back | 后退 |
+| `l` / `→` / `Enter` | Forward | 前进 |
+| `u` / `PgUp` | Prev Page | 上一页 |
+| `d` / `PgDn` | Next Page | 下一页 |
+| `f` / `Ctrl+F` | Search | 当前列表模糊搜索 |
+| `[` / `Shift+←` | Prev Song | 上一曲（Shift+方向键为尽力支持，依赖终端 terminfo） |
+| `]` / `Shift+→` | Next Song | 下一曲（Shift+方向键为尽力支持，依赖终端 terminfo） |
 | `num + [` | Quick Prev Song | 快速前 n 首 |
 | `num + ]` | Quick Next Song | 快速后 n 首 |
 | `num + Shift + g` | Index for Song | 跳到第 n 首 |
-| `=` | Volume + | 音量增加 |
+| `+` / `=` | Volume + | 音量增加 |
 | `-` | Volume - | 音量减少 |
 | `Space` | Play/Pause | 播放/暂停 |
 | `?` | Shuffle | 手气不错 |
@@ -178,8 +178,8 @@ npx skills add darknessomi/musicbox -y
 | `Shift + p` | Playing Mode | 播放模式切换 |
 | `a` | Add | 添加曲目到打碟 |
 | `Shift + a` | Enter Album | 进入专辑 |
-| `g` | To the First | 跳至首项 |
-| `Shift + g` | To the End | 跳至尾项 |
+| `g` / `Home` | To the First | 跳至首项 |
+| `Shift + g` / `End` | To the End | 跳至尾项 |
 | `z` | DJ List | 打碟列表 |
 | `s` | Star | 添加到收藏 |
 | `c` | Collection | 收藏列表 |
@@ -193,6 +193,15 @@ npx skills add darknessomi/musicbox -y
 | `q` | Quit | 退出 |
 | `t` | Timing Exit | 定时退出 |
 | `w` | Quit & Clear | 退出并清除用户信息 |
+| `y` / `F1` | Help | 帮助 |
+| `Esc` | Back / Clear Input | 有输入缓冲时清空；否则在非主菜单后退，主菜单无操作 |
+
+### 底部键位指示栏
+
+TUI 屏幕底部会常驻显示当前界面可用的快捷键提示（nano/htop 风格），并随界面
+切换自动更新。屏高小于 15 行时自动隐藏。该功能由配置文件
+`~/.netease-musicbox/config.json` 中的 `key_hints` 控制，默认值为 `true`；设为
+`false` 可关闭底部提示栏。
 
 ## 配置
 
