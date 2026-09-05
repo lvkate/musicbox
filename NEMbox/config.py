@@ -158,6 +158,11 @@ class Config(Singleton):
                 "default": 500,
                 "describe": "The time wait for the next key.",
             },
+            "key_hints": {
+                "value": True,
+                "default": True,
+                "describe": "Show the context-sensitive key hint bar.",
+            },
             "colors": {
                 "value": {
                     "pair1": [22, 148],

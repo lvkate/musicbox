@@ -27,6 +27,73 @@ log = logger.getLogger(__name__)
 
 _BACKSPACE_KEYS = {8, 127, 263, 330, getattr(curses, "KEY_BACKSPACE", 259)}
 
+KEY_HINTS = {
+    "default": [
+        ("↑↓", "移动"),
+        ("Enter", "进入"),
+        ("←", "返回"),
+        ("F1", "帮助"),
+        ("q", "退出"),
+    ],
+    "main": [
+        ("↑↓", "选择"),
+        ("Enter", "进入"),
+        ("F1", "帮助"),
+        ("q", "退出"),
+    ],
+    "songs": [
+        ("↑↓", "移动"),
+        ("Enter", "评论"),
+        ("空格", "播放"),
+        ("[]", "切歌"),
+        ("s", "收藏"),
+        ("C", "缓存"),
+        ("f", "搜索"),
+        ("F1", "帮助"),
+    ],
+    "fmsongs": [
+        ("↑↓", "移动"),
+        ("Enter", "评论"),
+        ("空格", "播放"),
+        ("[]", "切歌"),
+        ("s", "收藏"),
+        ("C", "缓存"),
+        ("f", "搜索"),
+        ("F1", "帮助"),
+        (".", "删除FM"),
+        ("/", "下一FM"),
+    ],
+    "djprograms": [
+        ("↑↓", "移动"),
+        ("Enter", "评论"),
+        ("空格", "播放"),
+        ("[]", "切歌"),
+        ("s", "收藏"),
+        ("C", "缓存"),
+        ("f", "搜索"),
+        ("F1", "帮助"),
+    ],
+    "comments": [
+        ("↑↓", "移动"),
+        ("PgUp/PgDn", "翻页"),
+        ("←", "返回"),
+        ("F1", "帮助"),
+    ],
+    "help": [
+        ("↑↓", "移动"),
+        ("G", "打开GitHub"),
+        ("←", "返回"),
+        ("q", "退出"),
+    ],
+}
+
+
+def format_hints(datatype, width) -> str:
+    """Format context-sensitive key hints within the available display width."""
+    hints = KEY_HINTS.get(datatype, KEY_HINTS["default"])
+    text = "  ".join(f"{key}:{description}" for key, description in hints)
+    return truelen_cut(text, max(width - 1, 0))
+
 
 def _is_backspace_key(ch) -> bool:
     if isinstance(ch, str):
@@ -389,6 +456,16 @@ class Ui:
     def build_submenu(self, data):
         pass
 
+    def build_key_hints(self, datatype):
+        if not self.config.get("key_hints") or self.y < 15:
+            return
+        self.addstr(
+            self.y - 1,
+            self.startcol,
+            format_hints(datatype, self.content_width),
+            curses.A_DIM,
+        )
+
     # start is the called timestamp of this function
     def build_menu(self, datatype, title, datalist, offset, index, step, start):
         # keep playing info in line 1
@@ -400,6 +477,7 @@ class Ui:
 
         if len(datalist) == 0:
             self.addstr(8, self.startcol, "这里什么都没有 -，-")
+            self.build_key_hints(datatype)
             return self.screen.refresh()
 
         if datatype == "main":
@@ -722,6 +800,7 @@ class Ui:
             )
             self.addstr(22, self.startcol, "Build with love to music by omi")
 
+        self.build_key_hints(datatype)
         self.screen.refresh()
 
     def build_login_qr(self, url):
