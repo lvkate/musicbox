@@ -34,15 +34,41 @@ def test_build_key_hints_disabled_does_not_draw():
     assert ui.build_key_hints("songs") is None
 
 
-def test_build_key_hints_hidden_on_small_terminal_does_not_draw():
+def test_build_key_hints_hides_below_menu_safe_height():
     ui = Ui.__new__(Ui)
     ui.config = SimpleNamespace(get=lambda name: True)
-    ui.y = 14
     ui.startcol = 1
     ui.content_width = 80
     ui.addstr = lambda *args: (_ for _ in ()).throw(AssertionError(args))
 
-    assert ui.build_key_hints("songs") is None
+    for ui.y in (14, 15, 19):
+        assert ui.build_key_hints("songs") is None
+
+
+def test_build_key_hints_hides_help_and_comments_until_footer_safe_height():
+    ui = Ui.__new__(Ui)
+    ui.config = SimpleNamespace(get=lambda name: True)
+    ui.startcol = 1
+    ui.content_width = 80
+    ui.addstr = lambda *args: (_ for _ in ()).throw(AssertionError(args))
+
+    for datatype in ("help", "comments"):
+        for ui.y in (21, 23):
+            assert ui.build_key_hints(datatype) is None
+
+
+def test_build_key_hints_draws_at_safe_menu_height():
+    calls = []
+    ui = Ui.__new__(Ui)
+    ui.config = SimpleNamespace(get=lambda name: True)
+    ui.y = 21
+    ui.startcol = 1
+    ui.content_width = 80
+    ui.addstr = lambda *args: calls.append(args)
+
+    ui.build_key_hints("songs")
+
+    assert calls
 
 
 def test_build_key_hints_uses_dim_attribute():

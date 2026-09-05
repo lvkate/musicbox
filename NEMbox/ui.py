@@ -95,6 +95,9 @@ def format_hints(datatype, width) -> str:
     return truelen_cut(text, max(width - 1, 0))
 
 
+_KEY_HINT_MIN_HEIGHTS = {"help": 24, "comments": 24}
+
+
 def _is_backspace_key(ch) -> bool:
     if isinstance(ch, str):
         return len(ch) == 1 and ord(ch) in (8, 127)
@@ -457,7 +460,8 @@ class Ui:
         pass
 
     def build_key_hints(self, datatype):
-        if not self.config.get("key_hints") or self.y < 15:
+        min_height = _KEY_HINT_MIN_HEIGHTS.get(datatype, 20)
+        if not self.config.get("key_hints") or self.y < 15 or self.y < min_height:
             return
         self.addstr(
             self.y - 1,
