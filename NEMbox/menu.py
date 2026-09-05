@@ -27,7 +27,7 @@ from rapidfuzz import process
 from . import logger
 from .api import NetEase
 from .cache import Cache
-from .cmd_parser import cmd_parser, erase_coroutine, parse_keylist
+from .cmd_parser import cmd_parser, erase_coroutine, match_key, parse_keylist
 from .config import Config
 from .osdlyrics import show_lyrics_new_process, stop_lyrics_process
 from .player import Player
@@ -63,12 +63,18 @@ else:
 shortcut = [
     [KEY_MAP["down"], "Down", "下移"],
     [KEY_MAP["up"], "Up", "上移"],
+    ["↓/" + KEY_MAP["down"], "Down", "下移"],
+    ["↑/" + KEY_MAP["up"], "Up", "上移"],
     ["<Num>+" + KEY_MAP["up"], "<num> Up", "上移num"],
     ["<Num>+" + KEY_MAP["down"], "<num> Down", "下移num"],
     [KEY_MAP["back"], "Back", "后退"],
     [KEY_MAP["forward"], "Forward", "前进"],
+    ["←/" + KEY_MAP["back"], "Back", "后退"],
+    ["→/" + KEY_MAP["forward"], "Forward", "前进"],
     [KEY_MAP["prevPage"], "Prev page", "上一页"],
     [KEY_MAP["nextPage"], "Next page", "下一页"],
+    ["PgUp/" + KEY_MAP["prevPage"], "Prev page", "上一页"],
+    ["PgDn/" + KEY_MAP["nextPage"], "Next page", "下一页"],
     [KEY_MAP["search"], "Search", "快速搜索"],
     [KEY_MAP["prevSong"], "Prev song", "上一曲"],
     [KEY_MAP["nextSong"], "Next song", "下一曲"],
@@ -78,6 +84,7 @@ shortcut = [
     [KEY_MAP["playPause"], "Play/Pause", "播放/暂停"],
     [KEY_MAP["shuffle"], "Shuffle", "手气不错"],
     [KEY_MAP["volume+"], "Volume+", "音量增加"],
+    ["=/" + KEY_MAP["volume+"], "Volume+", "音量增加"],
     [KEY_MAP["volume-"], "Volume-", "音量减少"],
     [KEY_MAP["menu"], "Menu", "主菜单"],
     [KEY_MAP["presentHistory"], "Present/History", "当前/历史播放列表"],
@@ -98,8 +105,11 @@ shortcut = [
     [KEY_MAP["quit"], "Quit", "退出"],
     [KEY_MAP["quitClear"], "Quit&Clear", "退出并清除用户信息"],
     [KEY_MAP["help"], "Help", "帮助"],
+    ["F1/" + KEY_MAP["help"], "Help", "帮助"],
     [KEY_MAP["top"], "Top", "回到顶部"],
     [KEY_MAP["bottom"], "Bottom", "跳转到底部"],
+    ["Home/" + KEY_MAP["top"], "Top", "回到顶部"],
+    ["End/" + KEY_MAP["bottom"], "Bottom", "跳转到底部"],
     [KEY_MAP["countDown"], "Count Down", "定时"],
 ]
 
@@ -745,7 +755,7 @@ class Menu:
 
             # 上移
             elif (
-                C.keyname(key).decode("utf-8") == KEY_MAP["up"]
+                match_key(key, "up")
                 and pre_key not in range(ord("0"), ord("9"))
                 or self.config.get("mouse_movement")
                 and key == KEY_MAP["mouseUp"]
@@ -754,7 +764,7 @@ class Menu:
 
             # 下移
             elif (
-                C.keyname(key).decode("utf-8") == KEY_MAP["down"]
+                match_key(key, "down")
                 and pre_key not in range(ord("0"), ord("9"))
                 or self.config.get("mouse_movement")
                 and key == KEY_MAP["mouseDown"]
@@ -762,19 +772,19 @@ class Menu:
                 self.down_key_event()
 
             # 向上翻页
-            elif C.keyname(key).decode("utf-8") == KEY_MAP["prevPage"]:
+            elif match_key(key, "prevPage"):
                 self.up_page_event()
 
             # 向下翻页
-            elif C.keyname(key).decode("utf-8") == KEY_MAP["nextPage"]:
+            elif match_key(key, "nextPage"):
                 self.down_page_event()
 
             # 前进
-            elif C.keyname(key).decode("utf-8") == KEY_MAP["forward"] or key == 10:
+            elif match_key(key, "forward") or key == 10:
                 self.enter_page_event()
 
             # 回退
-            elif C.keyname(key).decode("utf-8") == KEY_MAP["back"]:
+            elif match_key(key, "back"):
                 self.back_page_event()
 
             # 模糊搜索
@@ -803,7 +813,7 @@ class Menu:
                 self.prev_key_event()
 
             # 增加音量
-            elif C.keyname(key).decode("utf-8") == KEY_MAP["volume+"]:
+            elif match_key(key, "volume+") or key == ord("="):
                 self.player.volume_up()
 
             # 减少音量
@@ -1001,8 +1011,16 @@ class Menu:
                     self.datatype, self.title, self.datalist, *_ = self.stack[0]
                     self.offset = 0
                     self.index = 0
+            # 帮助
+            elif match_key(key, "help"):
+                self.stack.append([datatype, title, datalist, offset, self.index])
+                self.datatype = "help"
+                self.title += " > 帮助"
+                self.datalist = shortcut
+                self.offset = 0
+                self.index = 0
             # 跳到开头 g键
-            elif C.keyname(key).decode("utf-8") == KEY_MAP["top"]:
+            elif match_key(key, "top"):
                 if self.datatype == "help":
                     webbrowser.open_new_tab("https://github.com/darknessomi/musicbox")
                 else:
@@ -1010,7 +1028,7 @@ class Menu:
                     self.offset = 0
 
             # 跳到末尾ord('G') 键
-            elif C.keyname(key).decode("utf-8") == KEY_MAP["bottom"]:
+            elif match_key(key, "bottom"):
                 self.index = len(self.datalist) - 1
                 self.offset = self.index - self.index % self.step
 

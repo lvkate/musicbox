@@ -4,7 +4,7 @@
 捕获类似curses键盘输入流,生成指令流
 """
 
-import curses
+import curses as C
 from copy import deepcopy
 from functools import wraps
 
@@ -12,9 +12,40 @@ from .config import Config
 
 ERASE_SPEED = 5  # 屏幕5秒刷新一次 去除错误的显示
 
-__all__ = ["cmd_parser", "parse_keylist", "coroutine", "erase_coroutine"]
+__all__ = [
+    "ALT_KEYS",
+    "cmd_parser",
+    "match_key",
+    "parse_keylist",
+    "coroutine",
+    "erase_coroutine",
+]
 
 KEY_MAP = Config().get("keymap")
+
+# 特殊键双绑定：动作 -> 整数键码列表（字符键不在此列）
+ALT_KEYS = {
+    "up": [C.KEY_UP],
+    "down": [C.KEY_DOWN],
+    "back": [C.KEY_LEFT],
+    "forward": [C.KEY_RIGHT],
+    "prevPage": [C.KEY_PPAGE],
+    "nextPage": [C.KEY_NPAGE],
+    "top": [C.KEY_HOME],
+    "bottom": [C.KEY_END],
+    "help": [getattr(C, "KEY_F", lambda n: C.KEY_F0 + n)(1)],
+    "prevSong": [getattr(C, "KEY_SLEFT", 393)],
+    "nextSong": [getattr(C, "KEY_SRIGHT", 402)],
+}
+
+
+def match_key(key: int, action: str) -> bool:
+    """字符匹配（可配置 keymap）或特殊键码匹配（固定双绑定）。"""
+    if key < 0:
+        return False
+    if key in ALT_KEYS.get(action, []):
+        return True
+    return C.keyname(key).decode("utf-8") == KEY_MAP[action]
 
 
 def coroutine(func):
@@ -38,7 +69,7 @@ def _cmd_parser():
         key = yield
         if key > 0 and pre_key == -1 or key > 0 and pre_key > 0:
             keylist.append(key)
-        elif curses.keyname(key).decode("utf-8") in KEY_MAP.values() and pre_key > 0:
+        elif C.keyname(key).decode("utf-8") in KEY_MAP.values() and pre_key > 0:
             keylist.append(key)
             return keylist
         pre_key = key
