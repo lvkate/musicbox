@@ -5,7 +5,7 @@ import pytest
 
 from NEMbox import cmd_parser
 from NEMbox.cmd_parser import ALT_KEYS, KEY_MAP, match_key
-from NEMbox.menu import Menu
+from NEMbox.menu import Menu, _handle_escape
 
 
 @pytest.mark.parametrize(
@@ -32,6 +32,36 @@ def test_match_key_accepts_original_character_key(monkeypatch):
 
     assert match_key(ord("k"), "up")
     assert not match_key(ord("x"), "up")
+
+
+@pytest.mark.parametrize("action", ["prevSong", "nextSong"])
+def test_match_key_accepts_shift_arrow_key_codes(action):
+    key = ALT_KEYS[action][0]
+
+    assert match_key(key, action)
+
+
+@pytest.mark.parametrize(
+    ("pre_keylist", "key_list"),
+    [([ord("1")], []), ([], [ord("1")])],
+)
+def test_escape_clears_pending_input_without_navigating(pre_keylist, key_list):
+    assert not _handle_escape(pre_keylist, key_list, "songs")
+    assert pre_keylist == []
+    assert key_list == []
+
+
+def test_escape_navigates_back_when_buffer_is_empty():
+    assert _handle_escape([], [], "songs")
+
+
+def test_escape_is_noop_on_main_menu():
+    pre_keylist = []
+    key_list = []
+
+    assert not _handle_escape(pre_keylist, key_list, "main")
+    assert pre_keylist == []
+    assert key_list == []
 
 
 def test_match_key_uses_custom_character_keymap(monkeypatch):

@@ -50,6 +50,15 @@ def carousel(left, right, x):
         return x
 
 
+def _handle_escape(pre_keylist: list[int], key_list: list[int], datatype: str) -> bool:
+    """Clear pending input or request one-level back navigation."""
+    if pre_keylist or key_list:
+        pre_keylist.clear()
+        key_list.clear()
+        return False
+    return datatype != "main"
+
+
 KEY_MAP = cast(dict[str, Any], Config().get("keymap"))
 COMMAND_LIST = list(map(ord, KEY_MAP.values()))
 
@@ -80,6 +89,8 @@ shortcut = [
     [KEY_MAP["nextSong"], "Next song", "下一曲"],
     ["<Num>+" + KEY_MAP["nextSong"], "<Num> Next Song", "下num曲"],
     ["<Num>+" + KEY_MAP["prevSong"], "<Num> Prev song", "上num曲"],
+    ["Shift+←", "Prev song", "上一曲"],
+    ["Shift+→", "Next song", "下一曲"],
     ["<Num>", "Goto song <num>", "跳转指定歌曲id"],
     [KEY_MAP["playPause"], "Play/Pause", "播放/暂停"],
     [KEY_MAP["shuffle"], "Shuffle", "手气不错"],
@@ -106,6 +117,8 @@ shortcut = [
     [KEY_MAP["quitClear"], "Quit&Clear", "退出并清除用户信息"],
     [KEY_MAP["help"], "Help", "帮助"],
     ["F1/" + KEY_MAP["help"], "Help", "帮助"],
+    ["Esc", "Escape", "后退/清空输入缓冲"],
+    ["Ctrl+F/" + KEY_MAP["search"], "Search", "快速搜索"],
     [KEY_MAP["top"], "Top", "回到顶部"],
     [KEY_MAP["bottom"], "Bottom", "跳转到底部"],
     ["Home/" + KEY_MAP["top"], "Top", "回到顶部"],
@@ -708,8 +721,8 @@ class Menu:
                 self.pre_keylist.clear()
             # <Esc> 取消当前输入
             elif key == 27:
-                self.pre_keylist.clear()
-                self.key_list.clear()
+                if _handle_escape(self.pre_keylist, self.key_list, self.datatype):
+                    self.back_page_event()
 
             keylist = self.key_list
 
@@ -788,7 +801,7 @@ class Menu:
                 self.back_page_event()
 
             # 模糊搜索
-            elif C.keyname(key).decode("utf-8") == KEY_MAP["search"]:
+            elif C.keyname(key).decode("utf-8") == KEY_MAP["search"] or key == 6:
                 if self.at_search_result:
                     self.back_page_event()
                 self.stack.append(
@@ -801,15 +814,15 @@ class Menu:
                 self.at_search_result = True
 
             # 播放下一曲
-            elif C.keyname(key).decode("utf-8") == KEY_MAP[
-                "nextSong"
-            ] and pre_key not in range(ord("0"), ord("9")):
+            elif match_key(key, "nextSong") and pre_key not in range(
+                ord("0"), ord("9")
+            ):
                 self.next_key_event()
 
             # 播放上一曲
-            elif C.keyname(key).decode("utf-8") == KEY_MAP[
-                "prevSong"
-            ] and pre_key not in range(ord("0"), ord("9")):
+            elif match_key(key, "prevSong") and pre_key not in range(
+                ord("0"), ord("9")
+            ):
                 self.prev_key_event()
 
             # 增加音量
