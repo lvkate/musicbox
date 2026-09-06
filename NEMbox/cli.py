@@ -480,6 +480,11 @@ def cmd_auth_login(api: NetEase, ctx: CliContext, args: argparse.Namespace) -> i
     qr_ascii = _render_qr_ascii(api.login_qr_url(unikey))
     data = {"unikey": unikey, "qr_ascii": qr_ascii}
     human = f"{qr_ascii}\n请使用网易云音乐 App 扫描二维码登录。"
+    if ctx.json_mode and not ctx.quiet:
+        # stdout 必须是单行 JSON 供机器解析，终端会自动换行导致二维码
+        # 无法扫码；同时把可扫码的多行 QR 打到 stderr 供人直接扫码。
+        # 取值仍走 stdout JSON：jq -r .data.qr_ascii
+        print(human, file=sys.stderr)
     return ctx.emit_ok(
         data,
         human,
