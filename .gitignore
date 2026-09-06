@@ -48,3 +48,8 @@ test_login.py
 *.log
 
 docs/
+
+# Agent / tooling state (local-only caches, not part of the repo)
+.slim/
+.commandcode/
+.superpowers/
