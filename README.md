@@ -117,8 +117,22 @@ musicbox
 
 进入需要登录的功能时，终端会显示二维码。登录方式仅支持扫码登录，已不再支持账号密码登录。
 
+**TUI 登录（`musicbox`）：** 用网易云音乐手机 App 扫描二维码，并在手机上确认，TUI 内会自动轮询直到成功。
+
 1. 用网易云音乐手机 App 扫描二维码，并在手机上确认。
-2. 登录成功后 Cookie 写入 `~/.local/share/netease-musicbox/cookie.txt`（未设置 `XDG_DATA_HOME` 时为 `~/.netease-musicbox/cookie.txt`）。
+2. 登录成功后 Cookie 写入 `~/.local/share/netease-musicbox/cookie.txt`（未设置 `XDG_DATA_HOME` 时为 `~/.netease-musicbox/cookie.txt`），账号缓存写入同目录下的 `database.json`。
+
+**CLI 登录（split-flow，必须分两轮）：** `--no-wait` 只出码不写登录态，手机确认后必须再跑 `--check` 才会写入 Cookie 与账号缓存：
+
+```bash
+musicbox auth login --no-wait --json   # 第 1 轮：记下 unikey，扫码并在手机上确认
+musicbox auth login --check <unikey> --json  # 第 2 轮：确认后执行，返回 success 才算登上
+musicbox auth status --json            # 验证：logged_in 为 true
+```
+
+`unikey` 几分钟就过期（`expired`），过期请重新 `--no-wait`。`--json` 的二维码在 `stdout` 是单行转义 JSON，直接看会折行错乱、扫不出来；人肉扫码看终端 `stderr` 的多行字符块，或用 `... --json | jq -r .data.qr_ascii` 还原。
+
+**注意：开发版与全局版共用同一份登录。** `uv run musicbox`（源码）和 `uv tool install .`（全局 `musicbox`）读写的是同一套 `~/.netease-musicbox/`（或 XDG 对应路径），一边登录/登出/跑测试都会覆盖另一边；重装只换代码、不会清登录态，也不会提示重新登录。改 keymap 这类纯前端修改重装后直接进 TUI 即可，账号还是原来那个。
 
 终端以字符块渲染二维码，窗口建议 ≥25 行、等宽字体。必须使用网易云音乐 App 扫描二维码并在手机上确认，不支持打开 URL 完成登录。
 
@@ -139,6 +153,7 @@ musicbox pause --json
 musicbox status --json
 musicbox queue list --json
 musicbox auth login --no-wait --json
+musicbox auth login --check <unikey> --json  # 扫码确认后执行，登录才生效
 musicbox download --playlist 3778678 --path ./music --json
 ```
 
