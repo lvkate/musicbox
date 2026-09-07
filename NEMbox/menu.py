@@ -159,29 +159,36 @@ def _prepare_search_items(datalist: list[Any]) -> list[Any]:
     return search_items
 
 
-def _sync_login_state(api: Any, storage: Any) -> dict[str, Any] | None:
+def _sync_login_state(api: Any, storage: Any) -> tuple[str, dict[str, Any] | None]:
     """用实时会话校验登录态；缓存错位时原地校准。
 
-    TUI 的旧门禁只看本地缓存（`storage.database["user"]` 非空就放行），
+    TUI 的旧登录判断只看本地缓存（`storage.database["user"]` 非空就放行），
     脏缓存既能压住扫码弹窗、又会污染后续请求的 uid（如测试写入的假用户）。
-    这里以 `get_account_info()` 的实时结果为准：
-    会话有效则在缓存漂移时校准并落盘，返回 user dict；
-    会话无效返回 None，调用方走扫码登录。
+    这里以 `get_account_info()` 的实时结果为准，返回三态：
+    - ("valid", user)：会话有效；缓存漂移时已校准并落盘；
+    - ("anonymous", None)：服务器明确未登录；
+    - ("unknown", None)：网络失败（transport 哨兵 `{"code": -1}`），
+      此时不动缓存，调用方回退到只看本地缓存。
     注意：这是一次网络请求，只应在功能入口调用，不要放进高频 property。
     """
-    info = api.get_account_info() or {}
+    try:
+        info = api.get_account_info() or {}
+    except Exception:
+        return "unknown", None
+    if info.get("code") == -1:
+        return "unknown", None
     account = info.get("account") or {}
     profile = info.get("profile") or {}
     userid = account.get("id")
     nickname = profile.get("nickname") or ""
     if not userid:
-        return None
+        return "anonymous", None
     raw_user = storage.database.get("user", {})
     cached = raw_user if isinstance(raw_user, dict) else {}
     if cached.get("user_id") != userid or cached.get("nickname") != nickname:
         storage.login(nickname, "", userid, nickname)
         storage.save()
-    return {"user_id": userid, "nickname": nickname}
+    return "valid", {"user_id": userid, "nickname": nickname}
 
 
 class Menu:
@@ -190,6 +197,9 @@ class Menu:
         self.config = Config()
         self.datatype = "main"
         self.title = "网易云音乐"
+        # 标题后缀：启动检查明确未登录时为"（未登录）"，其余为空。
+        # 网络查不到时不挂后缀；登录成功后清空。渲染时拼接，stack 里只存干净标题。
+        self.login_suffix = ""
         self.datalist: list[Any] = [
             {"entry_name": "排行榜"},
             {"entry_name": "艺术家"},
@@ -259,13 +269,20 @@ class Menu:
         return self.user["nickname"]
 
     def _ensure_login(self) -> bool:
-        """功能入口的登录门禁：实时会话优先于本地缓存。
+        """功能入口的登录判断：实时会话优先于本地缓存。
 
         会话有效时直接放行（缓存错位则已由 `_sync_login_state` 校准，
-        无需扫码）；会话无效时先清掉脏缓存、再走扫码登录。
+        无需扫码）；服务器明确未登录时先清掉脏缓存、再走扫码；
+        网络查不到时不动缓存，沿用旧逻辑只看本地缓存。
         """
-        if _sync_login_state(self.api, self.storage):
+        state, _user = _sync_login_state(self.api, self.storage)
+        if state == "valid":
+            self.login_suffix = ""
             return True
+        if state == "unknown":
+            if self.account:
+                return True
+            return self.login()
         self.storage.logout()
         self.storage.save()
         return self.login()
@@ -322,6 +339,8 @@ class Menu:
         nickname = profile.get("nickname") or ""
         self.storage.login(nickname, "", userid, nickname)
         self.storage.save()
+        self.login_suffix = ""
+        self.build_menu_processbar()
         return True
 
     def _login_retry(self):
@@ -682,7 +701,7 @@ class Menu:
         )
         self.ui.build_menu(
             self.datatype,
-            self.title,
+            self.title + self.login_suffix,
             self.datalist,
             self.offset,
             self.index,
@@ -703,9 +722,16 @@ class Menu:
 
     def start(self):
         self.menu_starts = time.time()
+        # 启动时查一次登录态（放这里而不是 __init__：start_fork 会构造两次
+        # Menu，检查跑两遍浪费一次请求）。失败只影响后缀，不阻塞进界面。
+        try:
+            _state, _user = _sync_login_state(self.api, self.storage)
+        except Exception:
+            _state = "unknown"
+        self.login_suffix = "（未登录）" if _state == "anonymous" else ""
         self.ui.build_menu(
             self.datatype,
-            self.title,
+            self.title + self.login_suffix,
             self.datalist,
             self.offset,
             self.index,
