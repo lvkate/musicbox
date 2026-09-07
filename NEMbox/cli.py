@@ -7,6 +7,7 @@ import io
 import json
 import os
 import sys
+import time
 from typing import Any
 
 import requests
@@ -466,6 +467,11 @@ def cmd_auth_login(api: NetEase, ctx: CliContext, args: argparse.Namespace) -> i
             return ctx.emit_ok(data, f"登录成功: {user['nickname']}")
         data = {"status": status, "code": code, "message": resp.get("message", "")}
         human = f"登录状态: {status} (code={code})"
+        if code == 800:
+            human += (
+                "\n二维码已过期，重新出码（可复制）："
+                "musicbox auth login --no-wait --json"
+            )
         return ctx.emit_ok(data, human)
     if not args.no_wait:
         return ctx.emit_err(
@@ -479,7 +485,14 @@ def cmd_auth_login(api: NetEase, ctx: CliContext, args: argparse.Namespace) -> i
         return ctx.emit_err("api_error", "获取登录二维码失败")
     qr_ascii = _render_qr_ascii(api.login_qr_url(unikey))
     data = {"unikey": unikey, "qr_ascii": qr_ascii}
-    human = f"{qr_ascii}\n请使用网易云音乐 App 扫描二维码登录。"
+    check_cmd = f"musicbox auth login --check {unikey} --json"
+    issued_at = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+    human = (
+        f"{qr_ascii}\n请使用网易云音乐 App 扫描二维码登录。\n"
+        f"扫码并在手机上确认后，执行第二轮（本码出码时间 {issued_at}，"
+        f"过期后第二轮会报 expired，届时重出第一轮指令）：\n"
+        f"  {check_cmd}"
+    )
     if ctx.json_mode and not ctx.quiet:
         # stdout 必须是单行 JSON 供机器解析，终端会自动换行导致二维码
         # 无法扫码；同时把可扫码的多行 QR 打到 stderr 供人直接扫码。

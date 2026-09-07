@@ -1,4 +1,5 @@
 import json
+import re
 import sys
 
 import pytest
@@ -176,6 +177,11 @@ class LoggedInNetEase(FakeNetEase):
         return {"code": 803, "message": "success"}
 
 
+class ExpiredNetEase(FakeNetEase):
+    def login_qr_check(self, unikey):
+        return {"code": 800, "message": "expired"}
+
+
 def _run(monkeypatch, argv, api_cls=FakeNetEase):
     monkeypatch.setattr(cli, "NetEase", api_cls)
     return cli.main(argv)
@@ -321,6 +327,23 @@ def test_auth_login_check_success(monkeypatch, capsys):
     assert code == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["data"]["status"] == "success"
+
+
+def test_auth_login_no_wait_human_shows_copyable_check_command(monkeypatch, capsys):
+    code = _run(monkeypatch, ["auth", "login", "--no-wait"])
+    assert code == 0
+    out = capsys.readouterr().out
+    assert "musicbox auth login --check test-unikey --json" in out
+    assert re.search(r"出码时间 \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}", out)
+
+
+def test_auth_login_check_expired_human_shows_reissue_hint(monkeypatch, capsys):
+    code = _run(
+        monkeypatch, ["auth", "login", "--check", "stale-unikey"], ExpiredNetEase
+    )
+    assert code == 0
+    out = capsys.readouterr().out
+    assert "musicbox auth login --no-wait --json" in out
 
 
 def test_auth_logout_requires_confirmation(monkeypatch, capsys):
