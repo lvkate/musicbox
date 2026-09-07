@@ -159,6 +159,31 @@ def _prepare_search_items(datalist: list[Any]) -> list[Any]:
     return search_items
 
 
+def _sync_login_state(api: Any, storage: Any) -> dict[str, Any] | None:
+    """用实时会话校验登录态；缓存错位时原地校准。
+
+    TUI 的旧门禁只看本地缓存（`storage.database["user"]` 非空就放行），
+    脏缓存既能压住扫码弹窗、又会污染后续请求的 uid（如测试写入的假用户）。
+    这里以 `get_account_info()` 的实时结果为准：
+    会话有效则在缓存漂移时校准并落盘，返回 user dict；
+    会话无效返回 None，调用方走扫码登录。
+    注意：这是一次网络请求，只应在功能入口调用，不要放进高频 property。
+    """
+    info = api.get_account_info() or {}
+    account = info.get("account") or {}
+    profile = info.get("profile") or {}
+    userid = account.get("id")
+    nickname = profile.get("nickname") or ""
+    if not userid:
+        return None
+    raw_user = storage.database.get("user", {})
+    cached = raw_user if isinstance(raw_user, dict) else {}
+    if cached.get("user_id") != userid or cached.get("nickname") != nickname:
+        storage.login(nickname, "", userid, nickname)
+        storage.save()
+    return {"user_id": userid, "nickname": nickname}
+
+
 class Menu:
     def __init__(self):
         self.quit = False
@@ -233,6 +258,18 @@ class Menu:
     def username(self):
         return self.user["nickname"]
 
+    def _ensure_login(self) -> bool:
+        """功能入口的登录门禁：实时会话优先于本地缓存。
+
+        会话有效时直接放行（缓存错位则已由 `_sync_login_state` 校准，
+        无需扫码）；会话无效时先清掉脏缓存、再走扫码登录。
+        """
+        if _sync_login_state(self.api, self.storage):
+            return True
+        self.storage.logout()
+        self.storage.save()
+        return self.login()
+
     def login(self):
         # 扫码登录，不再支持账号密码
         unikey = self.api.login_qr_key()
@@ -284,6 +321,7 @@ class Menu:
         userid = account.get("id")
         nickname = profile.get("nickname") or ""
         self.storage.login(nickname, "", userid, nickname)
+        self.storage.save()
         return True
 
     def _login_retry(self):
@@ -1331,14 +1369,14 @@ class Menu:
             self.title += " > 精选歌单"
             self.datatype = "recommend_lists"
         elif idx == 4:
-            if not self.account:
-                self.login()
+            if not self._ensure_login():
+                return
             myplaylist = self.request_api(self.api.user_playlist, self.userid)
             self.datatype = "top_playlists"
             self.datalist = self.api.dig_info(myplaylist, self.datatype)
             self.title += " > " + self.username + " 的歌单"
         elif idx == 5:
-            if not self.account and not self.login():
+            if not self._ensure_login():
                 return
             cloud_songs = self.request_api(self.api.user_cloud)
             self.datatype = "songs"
@@ -1349,7 +1387,7 @@ class Menu:
             self.title += " > 主播电台"
             self.datalist = self.api.djRadios()
         elif idx == 7:
-            if not self.account and not self.login():
+            if not self._ensure_login():
                 return
             self.datatype = "songs"
             self.title += " > 每日推荐歌曲"
@@ -1358,7 +1396,7 @@ class Menu:
                 return
             self.datalist = self.api.dig_info(myplaylist, self.datatype)
         elif idx == 8:
-            if not self.account and not self.login():
+            if not self._ensure_login():
                 return
             myplaylist = self.request_api(self.api.recommend_resource)
             self.datatype = "top_playlists"
