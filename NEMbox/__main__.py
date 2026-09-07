@@ -31,7 +31,14 @@ def start():
         sys.exit(4)
     _lock_fd = acquire_lock()
     if _lock_fd is None:
-        print("无法获取 musicbox 运行锁，可能已有实例在运行。", file=sys.stderr)
+        from .daemon import describe_holder, lock_holder
+
+        desc = describe_holder(lock_holder())
+        print(
+            f"无法启动 TUI：{desc}正占着播放器（daemon 与 TUI 互斥）。\n"
+            "回那个终端继续用，或退出对方后重试。",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
     nembox_menu = Menu()

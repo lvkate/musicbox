@@ -63,4 +63,6 @@ def test_tui_exits_1_when_lock_unavailable(monkeypatch, capsys):
         __main__.start()
 
     assert exc.value.code == 1
-    assert "运行锁" in capsys.readouterr().err
+    err = capsys.readouterr().err
+    assert "无法启动 TUI" in err
+    assert "互斥" in err

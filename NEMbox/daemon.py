@@ -92,6 +92,62 @@ def is_daemon_running() -> bool:
         return False
 
 
+def _read_lock_pid() -> int | None:
+    """Read the pid recorded in the lock file; None if missing/dead/unreadable."""
+    try:
+        with open(Constant.lock_path) as f:
+            pid = int(f.read().strip().split()[0])
+    except (OSError, ValueError, IndexError):
+        return None
+    if pid <= 0:
+        return None
+    try:
+        os.kill(pid, 0)
+    except (OSError, OverflowError):
+        return None
+    return pid
+
+
+def _lock_is_held() -> bool:
+    """Non-destructive probe: True if someone else holds the flock."""
+    try:
+        fd = os.open(Constant.lock_path, os.O_RDWR)
+    except OSError:
+        return False
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        os.close(fd)
+        return True
+    with contextlib.suppress(OSError):
+        fcntl.flock(fd, fcntl.LOCK_UN)
+    os.close(fd)
+    return False
+
+
+def lock_holder() -> tuple[str, int | None]:
+    """Who owns the single-owner lock.
+
+    Returns ("daemon", pid) when the socket answers, ("tui", pid) when the
+    lock is held but the socket is dead, ("free", None) otherwise.
+    flock releases with the owner process, so a held lock always has a
+    live owner; "tui" also covers a second CLI/TUI instance the same way.
+    """
+    pid = _read_lock_pid()
+    if is_daemon_running():
+        return ("daemon", pid)
+    if _lock_is_held():
+        return ("tui", pid)
+    return ("free", None)
+
+
+def describe_holder(holder: tuple[str, int | None]) -> str:
+    """Human fragment like "TUI（pid 123）" for lock-conflict messages."""
+    kind, pid = holder
+    who = {"daemon": "musicbox daemon", "tui": "TUI"}.get(kind, "另一 musicbox 实例")
+    return f"{who}（pid {pid}）" if pid else who
+
+
 def send_request(
     method: str, params: dict[str, Any] | None = None, timeout: float = 10.0
 ) -> dict[str, Any]:
@@ -164,9 +220,17 @@ class MusicboxDaemon:
 
     def serve(self) -> int:
         if not self._acquire_lock():
+            kind, _pid = lock_holder()
+            desc = describe_holder((kind, _pid))
+            action = (
+                "先 `musicbox daemon stop` 后重试"
+                if kind == "daemon"
+                else "先按 q 退出 TUI 后重试"
+            )
             log.error("another daemon or TUI already owns the lock")
             print(
-                "musicbox 已在运行（daemon 或 TUI 占用），无法启动 daemon",
+                f"无法启动 daemon：{desc}正占着播放器（daemon 与 TUI 互斥）。\n"
+                f"{action}",
                 file=sys.stderr,
             )
             return 1

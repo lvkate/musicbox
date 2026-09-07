@@ -16,7 +16,9 @@ from . import __version__
 from .api import QUALITY_INPUTS, NetEase, is_supported_music_quality
 from .config import Config
 from .daemon import (
+    describe_holder,
     is_daemon_running,
+    lock_holder,
     send_request,
     spawn_daemon,
     stop_daemon,
@@ -590,6 +592,14 @@ def _ensure_daemon(ctx: CliContext, ns: argparse.Namespace) -> int | None:
             exit_code=EXIT_DAEMON_NOT_RUNNING,
         )
     if not spawn_daemon():
+        kind, _pid = lock_holder()
+        if kind == "tui":
+            return ctx.emit_err(
+                "daemon_not_running",
+                f"{describe_holder((kind, _pid))}正占着播放器，控制命令不可用",
+                "回 TUI 里操作，或退出 TUI 后重试（会自动拉起 daemon）",
+                exit_code=EXIT_DAEMON_NOT_RUNNING,
+            )
         return ctx.emit_err(
             "daemon_not_running",
             "daemon 自动启动失败",
