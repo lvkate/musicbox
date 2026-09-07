@@ -130,7 +130,7 @@ musicbox auth login --check <unikey> --json  # 第 2 轮：确认后执行，返
 musicbox auth status --json            # 验证：logged_in 为 true
 ```
 
-`unikey` 几分钟就过期（`expired`），过期请重新 `--no-wait`。`--json` 的二维码在 `stdout` 是单行转义 JSON，直接看会折行错乱、扫不出来；人肉扫码看终端 `stderr` 的多行字符块，或用 `... --json | jq -r .data.qr_ascii` 还原。
+`unikey` 的 TTL 服务端未公开固定秒数，不写死时长：第一轮输出内印有精确到秒的出码时间；是否过期以第二轮返回为准，报 `expired` 即重出 `--no-wait`。`--json` 的二维码在 `stdout` 是单行转义 JSON，直接看会折行错乱、扫不出来；人肉扫码看终端 `stderr` 的多行字符块，或用 `... --json | jq -r .data.qr_ascii` 还原。
 
 **注意：开发版与全局版共用同一份登录。** `uv run musicbox`（源码）和 `uv tool install .`（全局 `musicbox`）读写的是同一套 `~/.netease-musicbox/`（或 XDG 对应路径），一边登录/登出/跑测试都会覆盖另一边；重装只换代码、不会清登录态，也不会提示重新登录。改 keymap 这类纯前端修改重装后直接进 TUI 即可，账号还是原来那个。
 
